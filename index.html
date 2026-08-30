@@ -585,7 +585,7 @@ const restartBtn = document.getElementById('restartBtn');
 const SCOOP_R = 42;
 const OVERLAP_K = 0.55;
 const CLEAN_TOLERANCE = 8;
-const MIN_OVERLAP = 22;
+const MIN_OVERLAP = 16;
 const FALL_LIFT = 78;           // how far above the landing line the scoop slides, then drops in
 const BASE_CAM = 150;
 
@@ -651,6 +651,42 @@ function updateTweens(dtMs) {
 }
 
 /* ---- colour helpers ---- */
+function mix(h1, h2, t) {
+  const a = parseInt(h1.slice(1), 16), b = parseInt(h2.slice(1), 16);
+  const r = Math.round((a >> 16 & 255) * (1 - t) + (b >> 16 & 255) * t);
+  const g = Math.round((a >> 8 & 255) * (1 - t) + (b >> 8 & 255) * t);
+  const c = Math.round((a & 255) * (1 - t) + (b & 255) * t);
+  return 'rgb(' + r + ',' + g + ',' + c + ')';
+}
+// pastel sky that drifts through hues the higher the tower climbs
+const CANDY_SKY = ['#fff3f7', '#ffe9f2', '#fdeafc', '#ecefff', '#e8fbf1', '#fff7e6', '#ffeef1'];
+const CANDY_GND = ['#ffd6e6', '#ffd9cb', '#f0d6f7', '#d8e1ff', '#ccefdd', '#ffe7bd', '#ffd1dd'];
+function skyPair(alt) {
+  const seg = Math.max(0, alt) / 1500;
+  const i0 = Math.floor(seg) % CANDY_SKY.length;
+  const i1 = (i0 + 1) % CANDY_SKY.length;
+  const f = seg - Math.floor(seg);
+  return [mix(CANDY_SKY[i0], CANDY_SKY[i1], f), mix(CANDY_GND[i0], CANDY_GND[i1], f)];
+}
+// faint background candy shapes (no faces), just so the sky isn't empty
+function candyGlyph(type, x, y, s) {
+  ctx.beginPath();
+  if (type === 0) {                    // wrapped sweet
+    ctx.ellipse(x, y, s * 0.7, s * 0.5, 0, 0, 7); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x - s * 0.7, y); ctx.lineTo(x - s * 1.15, y - s * 0.45); ctx.lineTo(x - s * 1.15, y + s * 0.45); ctx.closePath();
+    ctx.moveTo(x + s * 0.7, y); ctx.lineTo(x + s * 1.15, y - s * 0.45); ctx.lineTo(x + s * 1.15, y + s * 0.45); ctx.closePath();
+    ctx.fill();
+  } else if (type === 1) {             // lollipop
+    ctx.arc(x, y, s * 0.62, 0, 7); ctx.fill();
+    ctx.fillRect(x - s * 0.08, y + s * 0.5, s * 0.16, s * 1.1);
+  } else {                             // gumdrop
+    ctx.moveTo(x - s * 0.7, y + s * 0.6);
+    ctx.quadraticCurveTo(x - s * 0.7, y - s * 0.8, x, y - s * 0.8);
+    ctx.quadraticCurveTo(x + s * 0.7, y - s * 0.8, x + s * 0.7, y + s * 0.6);
+    ctx.closePath(); ctx.fill();
+  }
+}
 function shade(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
   let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
@@ -686,6 +722,7 @@ function resetGame() {
   blocks.push(mkBlock(stageW / 2 - off, y0, SCOOP_R, c0, null, 0));
   blocks.push(mkBlock(stageW / 2 + off, y0, SCOOP_R, c1, null, 0));
   blocks.push(mkBlock(stageW / 2, nextY(y0, SCOOP_R, SCOOP_R), SCOOP_R, c2, null, 0));
+  blocks.forEach(b => { b.land = performance.now() - 3000; b.pop = 0; });  // cluster starts already settled
 
   spawnNext();
 }
@@ -696,6 +733,7 @@ function mkBlock(x, y, r, colorIdx, topping, trimSign) {
     seed: Math.random() * 10,
     face: ((colorIdx + Math.round(x)) % 3 === 0),
     pop: 0,
+    land: 0,
   };
 }
 
@@ -740,17 +778,31 @@ function resolveDrop() {
 
   const newIndex = blocks.length;
   const topping = ((newIndex + 1) % 5 === 0) ? true : null;
-  const newX = (overlapLeft + overlapRight) / 2;
-  const newR = overlapWidth / 2;
-  const newY = nextY(prev.y, prevR, newR);
+
+  // graphics-first placement: the scoop keeps roughly where the player dropped it
+  // and nestles into the shoulder of the one below - it does NOT snap to a rigid
+  // centred column. It only truly fails if there's almost no contact (handled above).
+  const support = overlapWidth / 2;
+  const newR = Math.max(MIN_OVERLAP, support * 0.45 + SCOOP_R * 0.55);   // stays plump, semi-real
+  let newX = current.x;
+  const maxOff = prevR * 0.72;                                          // can rest well off-centre
+  newX = Math.max(prev.x - maxOff, Math.min(prev.x + maxOff, newX));
+  const nestle = newR * 0.16 * (Math.abs(newX - prev.x) / (prevR || 1)); // sinks into the crook
+  const newY = nextY(prev.y, prevR, newR) - nestle;
+
   const cutAmount = SCOOP_R * 2 - overlapWidth;
   const trimSign = cutAmount > CLEAN_TOLERANCE ? (Math.sign(current.x - prev.x) || 1) : 0;
 
   const nb = mkBlock(newX, newY, newR, current.colorIdx, topping, trimSign);
   nb.pop = performance.now();
+  nb.land = performance.now();                     // starts the ball -> drippy-scoop morph
   blocks.push(nb);
 
-  if (trimSign) spawnDrip(newX + trimSign * newR, newY, colorHex(current.colorIdx), trimSign);
+  if (trimSign) {
+    const farEdge = trimSign > 0 ? current.x + SCOOP_R : current.x - SCOOP_R;
+    const nearEdge = trimSign > 0 ? overlapRight : overlapLeft;
+    spawnChunk((farEdge + nearEdge) / 2, newY + newR * 0.15, Math.max(8, Math.abs(farEdge - nearEdge)), colorHex(current.colorIdx), trimSign);
+  }
   spawnPlaceDust(newX, newY - newR, colorHex(current.colorIdx));
 
   score += 1;
@@ -813,6 +865,24 @@ function spawnPlaceDust(x, y, col) {
     particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: skin === 'pixel' ? Math.round(2 + Math.random() * 3) : 3 + Math.random() * 4, col: skin === 'doodle' ? SKIN_DATA.doodle.ink : col, life: 0, max: 380, type: skin === 'pixel' ? 'px' : (skin === 'doodle' ? 'ink' : 'blob'), seed: Math.random() * 9 });
   }
 }
+// the sliced-off overhang: one coherent lump of ice cream that peels off the
+// side and drips down over the tower, plus a few trailing droplets
+function spawnChunk(x, y, w, col, dir) {
+  particles.push({
+    type: 'chunk', x, y, w: Math.min(w, SCOOP_R * 1.7), col,
+    vx: dir * (0.7 + Math.random() * 0.7), vy: -0.2 - Math.random() * 0.5,
+    rot: 0, vr: dir * (0.05 + Math.random() * 0.06),
+    seed: Math.random() * 9, life: 0, max: 1000,
+  });
+  for (let i = 0; i < 3; i++) {
+    particles.push({
+      type: skin === 'pixel' ? 'px' : 'blob',
+      x: x + (Math.random() - 0.5) * w, y: y - Math.random() * 6,
+      vx: dir * Math.random() * 0.8, vy: 0.2 + Math.random() * 0.9,
+      r: skin === 'pixel' ? 3 : 3 + Math.random() * 4, col, life: 0, max: 520,
+    });
+  }
+}
 function updateParticles(dt) {
   const k = dt / 16;
   particles = particles.filter(p => {
@@ -820,6 +890,7 @@ function updateParticles(dt) {
     p.x += p.vx * k;
     p.y -= p.vy * k;          // game y is up, vy>0 => moving down
     p.vy -= 0.42 * k;         // gravity pulls down
+    if (p.rot != null) p.rot += p.vr * k;
     return p.life < p.max;
   });
 }
@@ -853,19 +924,28 @@ function buildPxSprite(colIdx) {
 function drawBackground() {
   const par = (cameraCurY - BASE_CAM) * viewScaleCur;
   if (skin === 'candy') {
+    const pair = skyPair(cameraCurY - BASE_CAM);
     const g = ctx.createLinearGradient(0, 0, 0, stageH);
-    g.addColorStop(0, SKIN_DATA.candy.bgTop);
-    g.addColorStop(0.55, SKIN_DATA.candy.bgMid);
-    g.addColorStop(1, SKIN_DATA.candy.bgBot);
+    g.addColorStop(0, pair[0]);
+    g.addColorStop(1, pair[1]);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, stageW, stageH);
-    // floating soft blobs
-    for (let i = 0; i < 6; i++) {
-      const bx = ((i * 97 + 40) % (stageW + 120)) - 60 + Math.sin(bgTime * 0.0004 + i) * 18;
-      const by = ((i * 160 + 120 + par * 0.15) % (stageH + 240)) - 120;
-      const rr = 40 + (i % 3) * 22;
+    // faint candy silhouettes, deliberately barely-there
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = 0.07;
+    for (let i = 0; i < 9; i++) {
+      const bx = ((i * 133 + 50) % (stageW + 180)) - 90 + Math.sin(bgTime * 0.0003 + i) * 12;
+      const by = (((i * 210 + 140 + par * 0.35) % (stageH + 420)) + (stageH + 420)) % (stageH + 420) - 210;
+      candyGlyph(i % 3, bx, by, 30 + (i % 3) * 12);
+    }
+    ctx.globalAlpha = 1;
+    // a few soft light pools
+    for (let i = 0; i < 3; i++) {
+      const bx = ((i * 197 + 90) % (stageW + 120)) - 60;
+      const by = ((i * 320 + 120 + par * 0.15) % (stageH + 300)) - 150;
+      const rr = 70 + i * 20;
       const rg = ctx.createRadialGradient(bx, by, 0, bx, by, rr);
-      rg.addColorStop(0, 'rgba(255,255,255,0.5)');
+      rg.addColorStop(0, 'rgba(255,255,255,0.4)');
       rg.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = rg;
       ctx.beginPath(); ctx.arc(bx, by, rr, 0, 7); ctx.fill();
@@ -917,43 +997,50 @@ function pixelDisc(x, y, r) {
 
 function drawCone() {
   const cx = sx(stageW / 2);
-  const apexY = sy(128);
-  const baseY = sy(-30);
-  const halfW = srad(SCOOP_R * 1.45);
+  const rimY = sy(135);   // wide opening at TOP, where the scoops sit
+  const tipY = sy(-70);   // pointy end at the BOTTOM
+  const halfW = srad(SCOOP_R * 1.7);
   const d = SKIN_DATA[skin];
   if (skin === 'candy') {
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(cx, apexY);
-    ctx.lineTo(cx - halfW, baseY);
-    ctx.lineTo(cx + halfW, baseY);
+    ctx.moveTo(cx - halfW, rimY);
+    ctx.lineTo(cx + halfW, rimY);
+    ctx.lineTo(cx, tipY);
     ctx.closePath();
     ctx.fillStyle = d.cone; ctx.fill();
     ctx.clip();
-    ctx.strokeStyle = d.coneDark; ctx.lineWidth = 3; ctx.globalAlpha = 0.6;
-    for (let i = -3; i < 12; i++) {
-      ctx.beginPath(); ctx.moveTo(cx - halfW + i * 20, baseY); ctx.lineTo(cx - halfW + i * 20 + 60, apexY - 40); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx + halfW - i * 20, baseY); ctx.lineTo(cx + halfW - i * 20 - 60, apexY - 40); ctx.stroke();
+    ctx.strokeStyle = d.coneDark; ctx.lineWidth = 3; ctx.globalAlpha = 0.55;
+    for (let i = -8; i < 16; i++) {
+      ctx.beginPath(); ctx.moveTo(cx - halfW + i * 20, rimY); ctx.lineTo(cx - halfW + i * 20 + 120, tipY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + halfW + i * 20, rimY); ctx.lineTo(cx + halfW + i * 20 - 120, tipY); ctx.stroke();
     }
+    ctx.globalAlpha = 1;
+    // rim highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(cx - halfW, rimY); ctx.lineTo(cx + halfW, rimY); ctx.stroke();
     ctx.restore();
   } else if (skin === 'doodle') {
     ctx.save();
     ctx.lineJoin = 'round';
-    wobbleTri(cx, apexY, halfW, baseY, 5.1);
+    wobbleTri(cx, rimY, halfW, tipY, 5.1);
     ctx.fillStyle = d.cone; ctx.fill();
-    ctx.save(); wobbleTri(cx, apexY, halfW, baseY, 5.1); ctx.clip();
+    ctx.save(); wobbleTri(cx, rimY, halfW, tipY, 5.1); ctx.clip();
     ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 3;
-    for (let i = -2; i < 10; i++) { ctx.beginPath(); ctx.moveTo(cx - halfW + i * 16, baseY); ctx.lineTo(cx - halfW + i * 16 + 50, apexY); ctx.stroke(); }
+    for (let i = -6; i < 12; i++) {
+      ctx.beginPath(); ctx.moveTo(cx - halfW + i * 16, rimY); ctx.lineTo(cx - halfW + i * 16 + 90, tipY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + halfW + i * 16, rimY); ctx.lineTo(cx + halfW + i * 16 - 90, tipY); ctx.stroke();
+    }
     ctx.restore();
-    wobbleTri(cx, apexY, halfW, baseY, 5.1);
+    wobbleTri(cx, rimY, halfW, tipY, 5.1);
     ctx.strokeStyle = d.ink; ctx.lineWidth = Math.max(3, srad(4)); ctx.stroke();
     ctx.restore();
   } else {
     ctx.imageSmoothingEnabled = false;
     const P = 6;
-    for (let yy = apexY; yy < baseY; yy += P) {
-      const t = (yy - apexY) / (baseY - apexY);
-      const w = halfW * t;
+    for (let yy = rimY; yy < tipY; yy += P) {
+      const t = (yy - rimY) / (tipY - rimY);
+      const w = halfW * (1 - t);
       const x0 = Math.round((cx - w) / P) * P;
       const x1 = Math.round((cx + w) / P) * P;
       for (let xx = x0; xx < x1; xx += P) {
@@ -963,18 +1050,17 @@ function drawCone() {
     }
     ctx.strokeStyle = SKIN_DATA.pixel.ink; ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(cx, apexY); ctx.lineTo(cx - halfW, baseY); ctx.moveTo(cx, apexY); ctx.lineTo(cx + halfW, baseY);
+    ctx.moveTo(cx - halfW, rimY); ctx.lineTo(cx, tipY); ctx.lineTo(cx + halfW, rimY);
     ctx.stroke();
   }
 }
 
-function wobbleTri(cx, apexY, halfW, baseY, seed) {
+function wobbleTri(cx, rimY, halfW, tipY, seed) {
   ctx.beginPath();
   const j = () => (Math.sin(seed += 1.7) * 2.2);
-  ctx.moveTo(cx + j(), apexY + j());
-  ctx.lineTo(cx - halfW + j(), baseY + j());
-  ctx.lineTo(cx + j(), baseY + j() + 4);
-  ctx.lineTo(cx + halfW + j(), baseY + j());
+  ctx.moveTo(cx - halfW + j(), rimY + j());
+  ctx.lineTo(cx + halfW + j(), rimY + j());
+  ctx.lineTo(cx + j(), tipY + j());
   ctx.closePath();
 }
 
@@ -990,26 +1076,52 @@ function wobbleCircle(x, y, r, seed, steps) {
   ctx.closePath();
 }
 
+// semi-realistic gelato-scoop outline. morphP 0 = perfect ball (in the air),
+// morphP 1 = fully settled: a touch flatter on top, wavy base with 3 soft drips
+// hanging straight down over the scoop below.
+function scoopPath(cx, cy, r, morphP, seed) {
+  const m = Math.max(0, Math.min(1, morphP));
+  const n = 44;
+  ctx.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    let ox = Math.cos(a) * r;
+    let oy = Math.sin(a) * r;               // canvas y-down: oy > 0 is the lower half
+    if (oy > 0) {
+      const edge = oy / r;                  // 0 at equator, 1 at the very bottom
+      const lobe = 0.5 + 0.5 * Math.sin(a * 3 + seed * 1.7);   // 3 rounded drips
+      oy += m * edge * (0.06 + 0.32 * lobe) * r;
+      ox *= (1 - m * edge * 0.05);
+    } else {
+      oy *= (1 - m * 0.06);                 // crown settles slightly
+    }
+    ox += m * Math.sin(a * 4 + seed) * r * 0.02;
+    i ? ctx.lineTo(cx + ox, cy + oy) : ctx.moveTo(cx + ox, cy + oy);
+  }
+  ctx.closePath();
+}
+
 function drawScoop(x, y, r, colorIdx, opts) {
   opts = opts || {};
   const col = colorHex(colorIdx);
+  const m = opts.morphP == null ? 0 : opts.morphP;
+  const seed = opts.seed || 1;
+  const fy = y - r * 0.05 * m;              // face rides up a touch as the base drips
   if (skin === 'candy') {
-    // drop shadow
     ctx.fillStyle = 'rgba(150,90,110,0.13)';
-    ctx.beginPath(); ctx.ellipse(x, y + r * 0.55, r * 0.92, r * 0.34, 0, 0, 7); ctx.fill();
-    // body
-    ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
-    ctx.fillStyle = col; ctx.fill();
-    ctx.lineWidth = Math.max(2, r * 0.05); ctx.strokeStyle = 'rgba(120,70,90,0.25)'; ctx.stroke();
-    // shading
-    const g = ctx.createRadialGradient(x - r * 0.32, y - r * 0.36, r * 0.15, x, y, r);
-    g.addColorStop(0, 'rgba(255,255,255,0.45)');
+    ctx.beginPath(); ctx.ellipse(x, y + r * 0.6, r * 0.9, r * 0.3, 0, 0, 7); ctx.fill();
+    const body = () => { if (m < 0.02) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); } else scoopPath(x, y, r, m, seed); };
+    body(); ctx.fillStyle = col; ctx.fill();
+    ctx.save(); body(); ctx.clip();
+    const g = ctx.createRadialGradient(x - r * 0.32, y - r * 0.38, r * 0.15, x, y + r * 0.1, r * 1.25);
+    g.addColorStop(0, 'rgba(255,255,255,0.5)');
     g.addColorStop(0.5, 'rgba(255,255,255,0)');
-    g.addColorStop(1, 'rgba(0,0,0,0.12)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
-    // gloss
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.beginPath(); ctx.ellipse(x - r * 0.34, y - r * 0.38, r * 0.22, r * 0.13, -0.5, 0, 7); ctx.fill();
+    g.addColorStop(1, 'rgba(0,0,0,0.14)');
+    ctx.fillStyle = g; ctx.fillRect(x - r * 1.7, y - r * 1.7, r * 3.4, r * 3.8);
+    ctx.restore();
+    body(); ctx.lineWidth = Math.max(2, r * 0.05); ctx.strokeStyle = 'rgba(120,70,90,0.26)'; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.beginPath(); ctx.ellipse(x - r * 0.34, y - r * 0.4, r * 0.22, r * 0.12, -0.5, 0, 7); ctx.fill();
     if (opts.topping) {
       ctx.fillStyle = '#fff';
       for (let i = 0; i < 7; i++) {
@@ -1018,16 +1130,16 @@ function drawScoop(x, y, r, colorIdx, opts) {
         ctx.fillRect(-1.6, -4, 3.2, 8); ctx.restore();
       }
     }
-    if (opts.face && r > 20) drawFaceCandy(x, y, r);
+    if (opts.face && r > 20) drawFaceCandy(x, fy, r);
   } else if (skin === 'doodle') {
-    const seed = opts.seed || 1;
-    wobbleCircle(x, y, r, seed);
-    ctx.fillStyle = col; ctx.fill();
-    ctx.save(); wobbleCircle(x, y, r, seed); ctx.clip();
+    const dm = Math.min(1, m + 0.16);        // doodle scoops are always a bit irregular
+    const body = () => scoopPath(x, y, r, dm, seed);
+    body(); ctx.fillStyle = col; ctx.fill();
+    ctx.save(); body(); ctx.clip();
     ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 3;
-    for (let i = -r; i < r; i += 8) { ctx.beginPath(); ctx.moveTo(x + i, y + r); ctx.lineTo(x + i + r, y - r * 0.3); ctx.stroke(); }
+    for (let i = -r; i < r; i += 8) { ctx.beginPath(); ctx.moveTo(x + i, y + r * 1.3); ctx.lineTo(x + i + r, y - r * 0.3); ctx.stroke(); }
     ctx.restore();
-    wobbleCircle(x, y, r, seed);
+    body();
     ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(3, r * 0.12); ctx.strokeStyle = SKIN_DATA.doodle.ink; ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.arc(x - r * 0.28, y - r * 0.32, r * 0.4, Math.PI * 1.05, Math.PI * 1.5); ctx.stroke();
@@ -1038,17 +1150,29 @@ function drawScoop(x, y, r, colorIdx, opts) {
         ctx.beginPath(); ctx.moveTo(px, y - r * 0.55); ctx.lineTo(px + 4, y - r * 0.3); ctx.stroke();
       }
     }
-    if (opts.face && r > 20) drawFaceDoodle(x, y, r);
+    if (opts.face && r > 20) drawFaceDoodle(x, fy, r);
   } else {
     const spr = pxSprites[colorIdx] || (pxSprites[colorIdx] = buildPxSprite(colorIdx));
     ctx.imageSmoothingEnabled = false;
     const size = Math.max(6, Math.round(r * 2));
-    ctx.drawImage(spr, Math.round(x - r), Math.round(y - r), size, size);
+    if (m > 0.03) {
+      ctx.save();
+      scoopPath(x, y, r, m, seed);
+      ctx.clip();
+      ctx.fillStyle = SKIN_DATA.pixel.colors[colorIdx % 6];
+      ctx.fillRect(Math.round(x - r * 1.4), Math.round(y - r), Math.round(r * 2.8), Math.round(r * 2.6));
+      ctx.drawImage(spr, Math.round(x - r), Math.round(y - r), size, size);
+      ctx.restore();
+      scoopPath(x, y, r, m, seed);
+      ctx.strokeStyle = SKIN_DATA.pixel.ink; ctx.lineWidth = 3; ctx.stroke();
+    } else {
+      ctx.drawImage(spr, Math.round(x - r), Math.round(y - r), size, size);
+    }
     if (opts.topping) {
       ctx.fillStyle = '#fff';
       for (let i = 0; i < 5; i++) ctx.fillRect(Math.round(x - r * 0.5 + i * r * 0.25), Math.round(y - r * 0.55), 4, 4);
     }
-    if (opts.face && r > 18) drawFacePixel(x, y, r);
+    if (opts.face && r > 18) drawFacePixel(x, fy, r);
   }
 }
 
@@ -1081,9 +1205,39 @@ function drawParticles() {
   for (const p of particles) {
     const px = sx(p.x), py = sy(p.y);
     const t = p.life / p.max;
-    const alpha = 1 - t;
+    const alpha = t > 0.65 ? (1 - t) / 0.35 : 1;
     ctx.globalAlpha = Math.max(0, alpha);
-    if (p.type === 'blob') {
+    if (p.type === 'chunk') {
+      const cw = srad(p.w * 0.5);
+      const ch = cw * (1 + t * 1.9);              // stretches as it drips down
+      ctx.save();
+      ctx.translate(px, py + ch * 0.4);
+      ctx.rotate(p.rot || 0);
+      if (skin === 'doodle') {
+        ctx.fillStyle = p.col;
+        wobbleCircle(0, 0, cw, p.seed || 3, 11);
+        ctx.save(); ctx.scale(1, ch / cw); ctx.fillStyle = p.col;
+        ctx.beginPath(); ctx.arc(0, 0, cw, 0, 7); ctx.fill(); ctx.restore();
+        ctx.lineWidth = 3; ctx.strokeStyle = SKIN_DATA.doodle.ink; ctx.lineJoin = 'round';
+        ctx.save(); ctx.scale(1, ch / cw); ctx.beginPath(); ctx.arc(0, 0, cw, 0, 7); ctx.stroke(); ctx.restore();
+      } else if (skin === 'pixel') {
+        ctx.fillStyle = p.col;
+        const s = Math.max(3, Math.round(cw * 0.7));
+        for (let gx = -1; gx <= 1; gx++) for (let gy = -1; gy <= 2; gy++) {
+          if (gx === 1 && gy === 2) continue;
+          ctx.fillStyle = (gx + gy) % 2 ? shade(p.col, -26) : p.col;
+          ctx.fillRect(Math.round(gx * s), Math.round(gy * s), s, s);
+        }
+      } else {
+        ctx.fillStyle = p.col;
+        ctx.beginPath(); ctx.ellipse(0, 0, cw * (1 - t * 0.2), ch, 0, 0, 7); ctx.fill();
+        // thin drip tail trailing above
+        ctx.beginPath(); ctx.moveTo(-cw * 0.2, -ch); ctx.quadraticCurveTo(0, -ch * 1.8, cw * 0.2, -ch); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.beginPath(); ctx.ellipse(-cw * 0.3, -ch * 0.3, cw * 0.22, ch * 0.18, -0.5, 0, 7); ctx.fill();
+      }
+      ctx.restore();
+    } else if (p.type === 'blob') {
       ctx.fillStyle = p.col;
       const stretch = 1 + t * 1.4;
       ctx.beginPath();
@@ -1147,11 +1301,12 @@ function frame(now) {
         if (age < 220) { const k = age / 220; const s = Math.sin(k * Math.PI) * 0.14; scaleY = 1 - s; scaleX = 1 + s; }
         else b.pop = 0;
       }
+      const morphP = b.land ? Math.min(1, (performance.now() - b.land) / 260) : 0;
       const bx = sx(b.x), by = sy(b.y), br = srad(b.r);
       ctx.save();
       ctx.translate(bx, by);
       ctx.scale(scaleX, scaleY);
-      drawScoop(0, 0, br, b.colorIdx, { topping: b.topping, face: b.face, seed: b.seed });
+      drawScoop(0, 0, br, b.colorIdx, { topping: b.topping, face: b.face, seed: b.seed, morphP });
       ctx.restore();
     }
 
