@@ -13,6 +13,30 @@
   }
   button { font-family: inherit; }
 
+  /* ---------- persistent top banner slot (Márk 2026-08-30) ----------
+     placeholder strip today; a native build later wires a real AdMob adaptive
+     banner here the same way SweetDefenders does. --tb offsets the top-anchored
+     UI so nothing hides behind it. */
+  :root { --tb: 0px; }
+  body.has-topbanner { --tb: calc(46px + env(safe-area-inset-top)); }
+  #topBanner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+    height: calc(46px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.35);
+    font-size: 10px; letter-spacing: 2px; font-weight: 800; text-transform: uppercase;
+  }
+  body.has-topbanner #topBanner { display: flex; }
+  body[data-skin="pixel"] #topBanner { background: rgba(0,0,0,0.28); color: rgba(255,255,255,0.5); }
+  body.has-topbanner .topbar { top: var(--tb); }
+  body.has-topbanner #gameBackBtn,
+  body.has-topbanner #skinCycleBtn { top: calc(16px + var(--tb)); }
+  body.has-topbanner #score { top: calc(22px + var(--tb)); }
+  body.has-topbanner #highScore { top: calc(70px + var(--tb)); }
+  body.has-topbanner #coinsEarned { top: calc(88px + var(--tb)); }
+  body.has-topbanner #hint { top: calc(110px + var(--tb)); }
+
   /* ---------- shared top currency bar ---------- */
   .topbar {
     position: fixed; top: 0; left: 0; right: 0;
@@ -315,6 +339,8 @@
 </style>
 </head>
 <body data-skin="candy">
+
+<div id="topBanner" aria-hidden="true">Ad</div>
 
 <!-- ============ HOME SCREEN ============ -->
 <div id="homeScreen">
@@ -1340,6 +1366,12 @@ restartBtn.addEventListener('click', (e) => { e.stopPropagation(); resetGame(); 
 window.addEventListener('resize', () => { if (gameScreen.classList.contains('open')) sizeCanvas(); });
 
 /* ================= boot ================= */
+// persistent top banner slot (placeholder for now). A future native build sets
+// window.__admobShowBanner; until then this is just the reserved strip.
+if (localStorage.getItem('gelatower_remove_ads') !== '1') {
+  document.body.classList.add('has-topbanner');
+  if (window.__admobShowBanner) { try { window.__admobShowBanner(); } catch (e) {} }
+}
 sizeCanvas();
 setCoins(getCoins());
 requestAnimationFrame(frame);
