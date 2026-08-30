@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gelatower - V1 prototype (2D skins)</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    touch-action: manipulation;
+  }
+  button { font-family: inherit; }
+
+  /* ---------- shared top currency bar ---------- */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px;
+    z-index: 20;
+  }
+  .topbar .left { display: flex; gap: 8px; }
+  .pill {
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(0,0,0,0.28);
+    color: #fff;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .icon-btn {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.28);
+    color: #fff;
+    font-size: 17px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ---------- HOME screen ---------- */
+  #homeScreen {
+    position: fixed; inset: 0;
+    background: linear-gradient(180deg, #fff3f7 0%, #ffe3ee 60%, #ffd6e5 100%);
+    display: flex; flex-direction: column; align-items: center;
+    z-index: 10;
+    transition: background 0.25s;
+  }
+  body[data-skin="doodle"] #homeScreen { background: #fbf7ec; }
+  body[data-skin="pixel"]  #homeScreen { background: linear-gradient(180deg, #2b1b4d 0%, #a63d6b 58%, #e06a4e 100%); }
+
+  .wordmark {
+    margin-top: 120px;
+    font-size: 52px; font-weight: 800; letter-spacing: -1px;
+    color: #4a3728;
+    transition: color 0.25s;
+  }
+  .wordmark span.hi {
+    background: linear-gradient(90deg, #ff9a3c, #ff5d8f, #7d5bf6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  body[data-skin="doodle"] .wordmark { color: #241c28; font-family: "Comic Sans MS", "Bradley Hand", cursive; }
+  body[data-skin="pixel"]  .wordmark { color: #fff; font-family: ui-monospace, Menlo, monospace; letter-spacing: 2px; text-shadow: 3px 3px 0 rgba(0,0,0,0.35); }
+  body[data-skin="pixel"]  .wordmark span.hi { -webkit-text-fill-color: #ffe08a; color: #ffe08a; background: none; }
+
+  .tagline { color: #8a6b78; font-size: 14px; margin-top: 6px; transition: color 0.25s; }
+  body[data-skin="pixel"] .tagline { color: rgba(255,255,255,0.9); }
+
+  /* skin picker */
+  .skinpick { display: flex; gap: 8px; margin-top: 26px; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+  .skinbtn {
+    padding: 9px 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(0,0,0,0.12);
+    background: rgba(255,255,255,0.7);
+    color: #4a3728;
+    font-size: 13px; font-weight: 800;
+    cursor: pointer;
+  }
+  .skinbtn.active {
+    border-color: #ff5d8f;
+    background: #fff;
+    color: #ff5d8f;
+    box-shadow: 0 4px 12px rgba(255,93,143,0.3);
+  }
+  body[data-skin="pixel"] .skinbtn { background: rgba(255,255,255,0.85); }
+
+  .cone {
+    margin-top: 54px;
+    width: 0; height: 0;
+    border-left: 46px solid transparent;
+    border-right: 46px solid transparent;
+    border-top: 90px solid #e0a860;
+    position: relative;
+  }
+  .deco-scoop {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    width: 96px; height: 96px; border-radius: 50%;
+    box-shadow: 0 6px 10px rgba(0,0,0,0.18), inset -6px -8px 14px rgba(0,0,0,0.15), inset 6px 8px 14px rgba(255,255,255,0.35);
+  }
+  .deco-scoop.s1 { top: -90px; background: #ff9a3c; }
+  .deco-scoop.s2 { top: -145px; width: 84px; height: 84px; background: #ff5d8f; }
+  .deco-scoop.s3 { top: -190px; width: 70px; height: 70px; background: #7d5bf6; }
+  #playBtn {
+    margin-top: 96px;
+    padding: 16px 60px;
+    border-radius: 999px;
+    border: none;
+    background: linear-gradient(90deg, #ff9a3c, #ff5d8f);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    box-shadow: 0 8px 20px rgba(255, 93, 143, 0.4);
+    cursor: pointer;
+  }
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex;
+    background: rgba(255,255,255,0.85);
+    border-top: 1px solid rgba(0,0,0,0.06);
+    padding: 10px 0 18px;
+  }
+  .nav-btn {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    border: none; background: none;
+    font-size: 11px; font-weight: 700;
+    color: #a9909a;
+    cursor: pointer;
+  }
+  .nav-btn .glyph { font-size: 22px; }
+  .nav-btn.active { color: #ff5d8f; }
+
+  /* ---------- modal shell (Settings / Shop) ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(30, 20, 30, 0.5);
+    display: none;
+    align-items: flex-end;
+    z-index: 30;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-sheet {
+    width: 100%;
+    max-height: 82vh;
+    background: #fff;
+    border-radius: 24px 24px 0 0;
+    padding: 20px 20px 30px;
+    overflow-y: auto;
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .modal-header h2 { margin: 0; font-size: 20px; color: #4a3728; }
+  .modal-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: none; background: #f3eef0; color: #4a3728;
+    font-size: 16px; cursor: pointer;
+  }
+
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 4px;
+    border-bottom: 1px solid #f3eef0;
+    color: #4a3728;
+    font-size: 15px;
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .toggle {
+    width: 46px; height: 27px; border-radius: 999px;
+    background: #e6dde2;
+    position: relative;
+    border: none;
+    cursor: pointer;
+  }
+  .toggle.on { background: #ff5d8f; }
+  .toggle .knob {
+    position: absolute; top: 3px; left: 3px;
+    width: 21px; height: 21px; border-radius: 50%;
+    background: #fff;
+    transition: left 0.15s;
+  }
+  .toggle.on .knob { left: 22px; }
+  .settings-link {
+    background: none; border: none;
+    color: #ff5d8f; font-weight: 700; font-size: 15px;
+    cursor: pointer; padding: 14px 4px;
+    text-align: left; width: 100%;
+    border-bottom: 1px solid #f3eef0;
+  }
+  .version-tag { text-align: center; color: #c7b6bd; font-size: 12px; margin-top: 14px; }
+
+  .shop-section-title { font-size: 13px; font-weight: 800; color: #a9909a; text-transform: uppercase; letter-spacing: 0.5px; margin: 18px 4px 10px; }
+  .shop-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .shop-card {
+    background: #fff3f7;
+    border-radius: 14px;
+    padding: 14px 8px;
+    text-align: center;
+  }
+  .shop-card .amount { font-size: 15px; font-weight: 800; color: #4a3728; margin-bottom: 8px; }
+  .shop-card button {
+    width: 100%;
+    padding: 8px 0;
+    border-radius: 999px;
+    border: none;
+    background: #37c977;
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .shop-wide-card {
+    background: #fff3f7;
+    border-radius: 14px;
+    padding: 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .shop-wide-card .title { font-weight: 800; color: #4a3728; font-size: 15px; }
+  .shop-wide-card .desc { font-size: 12px; color: #a9909a; margin-top: 2px; }
+  .shop-wide-card button {
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: none;
+    background: #ff5d8f;
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: rgba(20,20,20,0.85);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 0.25s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ---------- GAME screen ---------- */
+  #gameScreen {
+    position: fixed; inset: 0;
+    background: #6f7bd6;
+    display: none;
+    z-index: 15;
+  }
+  #gameScreen.open { display: block; }
+  #gameBackBtn { position: fixed; top: 16px; left: 16px; z-index: 20; }
+  #skinCycleBtn { position: fixed; top: 16px; right: 16px; z-index: 20; }
+  #score {
+    position: fixed; top: 22px; left: 0; right: 0;
+    text-align: center; font-size: 44px; font-weight: 800;
+    color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    z-index: 5; pointer-events: none;
+  }
+  body[data-skin="doodle"] #score { color: #241c28; text-shadow: 2px 2px 0 #fff; font-family: "Comic Sans MS", "Bradley Hand", cursive; }
+  body[data-skin="pixel"]  #score { color: #fff; font-family: ui-monospace, Menlo, monospace; letter-spacing: 3px; text-shadow: 4px 4px 0 rgba(0,0,0,0.4); }
+  #highScore {
+    position: fixed; top: 70px; left: 0; right: 0;
+    text-align: center; font-size: 14px; font-weight: 700;
+    color: rgba(255,255,255,0.9);
+    z-index: 5; pointer-events: none;
+  }
+  body[data-skin="doodle"] #highScore { color: rgba(40,28,40,0.7); }
+  #coinsEarned {
+    position: fixed; top: 88px; left: 0; right: 0;
+    text-align: center; font-size: 13px; font-weight: 700;
+    color: #ffe66d;
+    z-index: 5; pointer-events: none;
+  }
+  #hint {
+    position: fixed; top: 110px; left: 0; right: 0;
+    text-align: center; font-size: 14px; color: rgba(255,255,255,0.85);
+    z-index: 5; pointer-events: none;
+  }
+  body[data-skin="doodle"] #hint { color: rgba(40,28,40,0.6); }
+  #stage { position: absolute; inset: 0; }
+  #stage canvas { display: block; }
+  #overlay {
+    position: fixed; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    flex-direction: column;
+    background: rgba(20, 22, 50, 0.55);
+    color: #fff;
+    z-index: 10;
+    text-align: center;
+  }
+  #overlay h2 { font-size: 30px; margin: 0 0 6px; }
+  #overlay p { margin: 0 0 20px; opacity: 0.85; }
+  #overlay .overlay-buttons { display: flex; gap: 12px; }
+  #overlay button {
+    padding: 12px 26px;
+    border-radius: 999px;
+    border: none;
+    background: #fff;
+    color: #4a4fb0;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body data-skin="candy">
+
+<!-- ============ HOME SCREEN ============ -->
+<div id="homeScreen">
+  <div class="topbar">
+    <div class="left">
+      <div class="pill">🪙 <span id="coinsHome">0</span></div>
+    </div>
+    <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
+  </div>
+
+  <div class="wordmark">gela<span class="hi">TO</span>wer</div>
+  <div class="tagline">stack the scoops as high as you can</div>
+
+  <div class="skinpick" id="skinPick">
+    <button class="skinbtn" data-skin="candy">🍬 Cukorpötty</button>
+    <button class="skinbtn" data-skin="doodle">✏️ Firka</button>
+    <button class="skinbtn" data-skin="pixel">👾 Pixel</button>
+  </div>
+
+  <div class="cone">
+    <div class="deco-scoop s1"></div>
+    <div class="deco-scoop s2"></div>
+    <div class="deco-scoop s3"></div>
+  </div>
+
+  <button id="playBtn">PLAY</button>
+
+  <div class="bottom-nav">
+    <button class="nav-btn" id="shopNavBtn"><span class="glyph">🛍️</span>Shop</button>
+    <button class="nav-btn active"><span class="glyph">🏠</span>Home</button>
+    <button class="nav-btn" id="settingsNavBtn"><span class="glyph">⚙️</span>Settings</button>
+  </div>
+</div>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>Settings</h2>
+      <button class="modal-close" data-close="settingsModal">✕</button>
+    </div>
+
+    <div class="settings-row">
+      <span>Sound</span>
+      <button class="toggle on" id="soundToggle"><span class="knob"></span></button>
+    </div>
+    <div class="settings-row">
+      <span>Vibration</span>
+      <button class="toggle on" id="vibrationToggle"><span class="knob"></span></button>
+    </div>
+    <div class="settings-row">
+      <span>Remove Ads</span>
+      <button class="toggle" id="removeAdsToggle"><span class="knob"></span></button>
+    </div>
+
+    <button class="settings-link" id="restoreBtn">Restore purchases</button>
+    <button class="settings-link" id="rateBtn">Rate us</button>
+    <button class="settings-link" id="contactBtn">Contact us</button>
+    <button class="settings-link" id="privacyBtn">Privacy policy</button>
+    <button class="settings-link" id="tosBtn">Terms of service</button>
+
+    <div class="version-tag">Gelatower 0.2.0 (V1 prototype - 2D skins)</div>
+  </div>
+</div>
+
+<!-- ============ SHOP MODAL ============ -->
+<div class="modal-backdrop" id="shopModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>Shop</h2>
+      <button class="modal-close" data-close="shopModal">✕</button>
+    </div>
+
+    <div class="shop-wide-card">
+      <div>
+        <div class="title">Remove Ads</div>
+        <div class="desc">No forced ads between runs, ever</div>
+      </div>
+      <button data-buy="remove_ads">$2.99</button>
+    </div>
+    <div class="shop-section-title">Extra continues</div>
+    <div class="shop-grid">
+      <div class="shop-card"><div class="amount">🍦 +3</div><button data-buy="continues_3">$1.49</button></div>
+      <div class="shop-card"><div class="amount">🍦 +10</div><button data-buy="continues_10">$3.99</button></div>
+      <div class="shop-card"><div class="amount">🍦 +25</div><button data-buy="continues_25">$5.99</button></div>
+    </div>
+
+    <div class="shop-section-title">Coin packs</div>
+    <div class="shop-grid">
+      <div class="shop-card"><div class="amount">🪙 1,000</div><button data-buy="coins_1000">$0.99</button></div>
+      <div class="shop-card"><div class="amount">🪙 5,000</div><button data-buy="coins_5000">$3.49</button></div>
+      <div class="shop-card"><div class="amount">🪙 10,000</div><button data-buy="coins_10000">$6.99</button></div>
+      <div class="shop-card"><div class="amount">🪙 25,000</div><button data-buy="coins_25000">$12.99</button></div>
+      <div class="shop-card"><div class="amount">🪙 50,000</div><button data-buy="coins_50000">$24.99</button></div>
+      <div class="shop-card"><div class="amount">🪙 100,000</div><button data-buy="coins_100000">$44.99</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ============ GAME SCREEN ============ -->
+<div id="gameScreen">
+  <button class="icon-btn" id="gameBackBtn">←</button>
+  <button class="icon-btn" id="skinCycleBtn" title="Change look">🎨</button>
+  <div id="score">0</div>
+  <div id="highScore">Best: 0</div>
+  <div id="coinsEarned"></div>
+  <div id="hint">Tap / click / space to drop the scoop</div>
+  <div id="stage"></div>
+
+  <div id="overlay">
+    <h2 id="overlayTitle">Melted!</h2>
+    <p id="overlaySub">Final height: 0</p>
+    <div class="overlay-buttons">
+      <button id="homeFromOverlayBtn">Home</button>
+      <button id="restartBtn">Play again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= shared state: coins, settings, skin ================= */
+const COINS_KEY = 'gelatower_coins';
+const SETTINGS_KEY = 'gelatower_settings';
+const SKIN_KEY = 'gelatower_skin';
+const HIGH_SCORE_KEY = 'gelatower_high_score';
+
+function getCoins() {
+  try { return parseInt(localStorage.getItem(COINS_KEY), 10) || 0; } catch (e) { return 0; }
+}
+function setCoins(v) {
+  try { localStorage.setItem(COINS_KEY, String(v)); } catch (e) {}
+  document.getElementById('coinsHome').textContent = v;
+}
+function addCoins(delta) { setCoins(getCoins() + delta); }
+
+function getSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || { sound: true, vibration: true, removeAds: false }; }
+  catch (e) { return { sound: true, vibration: true, removeAds: false }; }
+}
+function saveSettings(s) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch (e) {} }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+/* ================= navigation ================= */
+const homeScreen = document.getElementById('homeScreen');
+const gameScreen = document.getElementById('gameScreen');
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => closeModal(btn.dataset.close)));
+document.getElementById('settingsBtn').addEventListener('click', () => openModal('settingsModal'));
+document.getElementById('settingsNavBtn').addEventListener('click', () => openModal('settingsModal'));
+document.getElementById('shopNavBtn').addEventListener('click', () => openModal('shopModal'));
+
+function goHome() {
+  gameScreen.classList.remove('open');
+  homeScreen.style.display = 'flex';
+  setCoins(getCoins());
+}
+function goToGame() {
+  homeScreen.style.display = 'none';
+  gameScreen.classList.add('open');
+  sizeCanvas();
+  resetGame();
+}
+document.getElementById('playBtn').addEventListener('click', goToGame);
+document.getElementById('gameBackBtn').addEventListener('click', goHome);
+document.getElementById('homeFromOverlayBtn').addEventListener('click', goHome);
+
+/* ================= settings wiring ================= */
+(function initSettings() {
+  const s = getSettings();
+  const soundToggle = document.getElementById('soundToggle');
+  const vibrationToggle = document.getElementById('vibrationToggle');
+  const removeAdsToggle = document.getElementById('removeAdsToggle');
+  function apply() {
+    soundToggle.classList.toggle('on', s.sound);
+    vibrationToggle.classList.toggle('on', s.vibration);
+    removeAdsToggle.classList.toggle('on', s.removeAds);
+  }
+  apply();
+  soundToggle.addEventListener('click', () => { s.sound = !s.sound; saveSettings(s); apply(); });
+  vibrationToggle.addEventListener('click', () => { s.vibration = !s.vibration; saveSettings(s); apply(); });
+  removeAdsToggle.addEventListener('click', () => showToast('Remove Ads is set up in the Shop, not here yet'));
+  document.getElementById('restoreBtn').addEventListener('click', () => showToast('Nothing to restore in this prototype build'));
+  document.getElementById('rateBtn').addEventListener('click', () => showToast('Rate us - hooked up once this ships to the store'));
+  document.getElementById('contactBtn').addEventListener('click', () => showToast('Contact us - support email goes here'));
+  document.getElementById('privacyBtn').addEventListener('click', () => showToast('Privacy policy link goes here'));
+  document.getElementById('tosBtn').addEventListener('click', () => showToast('Terms of service link goes here'));
+})();
+
+/* ================= shop wiring (placeholder) ================= */
+document.querySelectorAll('[data-buy]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const id = btn.dataset.buy;
+    if (id.startsWith('coins_')) {
+      const amount = parseInt(id.split('_')[1], 10);
+      showToast('Real purchases come later - for now, have ' + amount.toLocaleString() + ' coins on the house');
+      addCoins(amount);
+    } else {
+      showToast('Real purchases come later (' + id + ')');
+    }
+  });
+});
+
+/* ================= skin system ================= */
+const SKINS = ['candy', 'doodle', 'pixel'];
+let skin = 'candy';
+let pxSprites = {};   // pixel-skin scoop sprite cache (declared here so applySkin can clear it)
+try { const s = localStorage.getItem(SKIN_KEY); if (SKINS.includes(s)) skin = s; } catch (e) {}
+
+const SKIN_DATA = {
+  candy: {
+    colors: ['#ff9ec4', '#ffc48c', '#9ed8c6', '#b9a9e6', '#8fd3f0', '#ffe08a'],
+    bgTop: '#fff3f7', bgMid: '#ffe0ec', bgBot: '#ffd0e6',
+    cone: '#eab873', coneDark: '#cc9350',
+  },
+  doodle: {
+    colors: ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#c780e8', '#ff9f45'],
+    paper: '#fbf7ec', rule: 'rgba(90,120,190,0.16)', margin: 'rgba(230,120,120,0.5)',
+    ink: '#241c28', cone: '#f0c27b',
+  },
+  pixel: {
+    colors: ['#f7b7d3', '#f9d876', '#a6e17d', '#5bd6d6', '#b9a9f7', '#f77f5c'],
+    bands: ['#241542', '#4a1f5e', '#8a2f63', '#d05a4c', '#f2a24c'],
+    ink: '#1c1030', cone: '#e0a860',
+  },
+};
+
+function applySkin(s) {
+  if (!SKINS.includes(s)) return;
+  skin = s;
+  try { localStorage.setItem(SKIN_KEY, s); } catch (e) {}
+  document.body.dataset.skin = s;
+  document.querySelectorAll('#skinPick .skinbtn').forEach(b => b.classList.toggle('active', b.dataset.skin === s));
+  pxSprites = {};
+}
+document.querySelectorAll('#skinPick .skinbtn').forEach(b => {
+  b.addEventListener('click', () => applySkin(b.dataset.skin));
+});
+document.getElementById('skinCycleBtn').addEventListener('click', () => {
+  applySkin(SKINS[(SKINS.indexOf(skin) + 1) % SKINS.length]);
+});
+applySkin(skin);
+
+/* ================= GAME CORE (physics in pixel space, 2D canvas render) ================= */
+const stageEl = document.getElementById('stage');
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+stageEl.appendChild(canvas);
+
+const scoreEl = document.getElementById('score');
+const highScoreEl = document.getElementById('highScore');
+const coinsEarnedEl = document.getElementById('coinsEarned');
+const overlay = document.getElementById('overlay');
+const overlayTitle = document.getElementById('overlayTitle');
+const overlaySub = document.getElementById('overlaySub');
+const restartBtn = document.getElementById('restartBtn');
+
+const SCOOP_R = 42;
+const OVERLAP_K = 0.55;
+const CLEAN_TOLERANCE = 8;
+const MIN_OVERLAP = 22;
+const FALL_LIFT = 78;           // how far above the landing line the scoop slides, then drops in
+const BASE_CAM = 150;
+
+let stageW = window.innerWidth;
+let stageH = window.innerHeight;
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+let blocks = [];
+let current = null;
+let dropping = null;            // {t, dur}
+let score = 0;
+let running = false;
+let particles = [];
+let tweens = [];
+let shake = 0;
+let bgTime = 0;
+
+/* camera / view */
+let cameraTargetY = BASE_CAM;
+let cameraCurY = BASE_CAM;
+let viewScale = 1;
+let viewScaleCur = 1;
+
+function anchorY() { return stageH * 0.80; }
+function sx(gx) { return stageW / 2 + (gx - stageW / 2) * viewScaleCur; }
+function sy(gy) { return anchorY() - (gy - cameraCurY) * viewScaleCur; }
+function srad(r) { return r * viewScaleCur; }
+
+function sizeCanvas() {
+  stageW = window.innerWidth;
+  stageH = window.innerHeight;
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(stageW * DPR);
+  canvas.height = Math.round(stageH * DPR);
+  canvas.style.width = stageW + 'px';
+  canvas.style.height = stageH + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+
+function colorHex(i) { return SKIN_DATA[skin].colors[i % 6]; }
+function randomColorIdx() { return Math.floor(Math.random() * 6); }
+function nextColorIdx(excludeIdx) {
+  let idx;
+  do { idx = Math.floor(Math.random() * 6); } while (idx === excludeIdx);
+  return idx;
+}
+
+function getHighScore() { try { return parseInt(localStorage.getItem(HIGH_SCORE_KEY), 10) || 0; } catch (e) { return 0; } }
+function setHighScore(v) { try { localStorage.setItem(HIGH_SCORE_KEY, String(v)); } catch (e) {} }
+
+function nextY(prevY, prevR, newR) { return prevY + (prevR + newR) * OVERLAP_K; }
+
+/* ---- tiny tween system (reused for zoom-out on death) ---- */
+function addTween(t) { tweens.push(t); }
+function updateTweens(dtMs) {
+  tweens = tweens.filter(tw => {
+    tw.elapsed += dtMs;
+    const p = Math.min(1, tw.elapsed / tw.duration);
+    tw.update(p);
+    if (p >= 1) { tw.onDone && tw.onDone(); return false; }
+    return true;
+  });
+}
+
+/* ---- colour helpers ---- */
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  r = Math.max(0, Math.min(255, r + amt));
+  g = Math.max(0, Math.min(255, g + amt));
+  b = Math.max(0, Math.min(255, b + amt));
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+/* ================= game lifecycle ================= */
+function resetGame() {
+  blocks = [];
+  particles = [];
+  tweens = [];
+  dropping = null;
+  current = null;
+  score = 0;
+  shake = 0;
+  scoreEl.textContent = '0';
+  highScoreEl.textContent = 'Best: ' + getHighScore();
+  coinsEarnedEl.textContent = '';
+  overlay.style.display = 'none';
+  running = true;
+
+  viewScale = 1; viewScaleCur = 1;
+  cameraTargetY = BASE_CAM; cameraCurY = BASE_CAM;
+
+  const y0 = 150;
+  const off = SCOOP_R * 0.5;
+  const c0 = randomColorIdx();
+  const c1 = nextColorIdx(c0);
+  const c2 = nextColorIdx(c1);
+  blocks.push(mkBlock(stageW / 2 - off, y0, SCOOP_R, c0, null, 0));
+  blocks.push(mkBlock(stageW / 2 + off, y0, SCOOP_R, c1, null, 0));
+  blocks.push(mkBlock(stageW / 2, nextY(y0, SCOOP_R, SCOOP_R), SCOOP_R, c2, null, 0));
+
+  spawnNext();
+}
+
+function mkBlock(x, y, r, colorIdx, topping, trimSign) {
+  return {
+    x, y, r, colorIdx, topping, trimSign,
+    seed: Math.random() * 10,
+    face: ((colorIdx + Math.round(x)) % 3 === 0),
+    pop: 0,
+  };
+}
+
+function spawnNext() {
+  const prev = blocks[blocks.length - 1];
+  const speed = Math.min(2.6 + blocks.length * 0.1, 7.5);
+  const dir = blocks.length % 2 === 0 ? 1 : -1;
+  current = {
+    x: dir === 1 ? SCOOP_R : stageW - SCOOP_R,
+    y: nextY(prev.y, prev.r, SCOOP_R),
+    dir,
+    speed,
+    colorIdx: nextColorIdx(prev.colorIdx),
+    seed: Math.random() * 10,
+    fallP: 0,
+  };
+  const want = current.y - stageH * 0.50;
+  if (want > cameraTargetY) cameraTargetY = want;
+}
+
+function drop() {
+  if (!gameScreen.classList.contains('open') || !running || !current || dropping) return;
+  dropping = { t: 0, dur: 130 };
+}
+
+function resolveDrop() {
+  const prev = blocks[blocks.length - 1];
+  const prevR = prev.r || SCOOP_R;
+  const fallingLeft = current.x - SCOOP_R, fallingRight = current.x + SCOOP_R;
+  const prevLeft = prev.x - prevR, prevRight = prev.x + prevR;
+  const overlapLeft = Math.max(fallingLeft, prevLeft);
+  const overlapRight = Math.min(fallingRight, prevRight);
+  const overlapWidth = overlapRight - overlapLeft;
+
+  if (overlapWidth < MIN_OVERLAP) {
+    const missDir = Math.sign(current.x - prev.x) || 1;
+    spawnMelt(current.x, current.y, colorHex(current.colorIdx), missDir);
+    shake = 10;
+    gameOver();
+    return;
+  }
+
+  const newIndex = blocks.length;
+  const topping = ((newIndex + 1) % 5 === 0) ? true : null;
+  const newX = (overlapLeft + overlapRight) / 2;
+  const newR = overlapWidth / 2;
+  const newY = nextY(prev.y, prevR, newR);
+  const cutAmount = SCOOP_R * 2 - overlapWidth;
+  const trimSign = cutAmount > CLEAN_TOLERANCE ? (Math.sign(current.x - prev.x) || 1) : 0;
+
+  const nb = mkBlock(newX, newY, newR, current.colorIdx, topping, trimSign);
+  nb.pop = performance.now();
+  blocks.push(nb);
+
+  if (trimSign) spawnDrip(newX + trimSign * newR, newY, colorHex(current.colorIdx), trimSign);
+  spawnPlaceDust(newX, newY - newR, colorHex(current.colorIdx));
+
+  score += 1;
+  scoreEl.textContent = score;
+  spawnNext();
+}
+
+function gameOver() {
+  running = false;
+  current = null;
+  dropping = null;
+
+  const topBlock = blocks[blocks.length - 1];
+  const towerPx = (topBlock.y - BASE_CAM) + 260;
+  const targetScale = Math.max(0.3, Math.min(1, (stageH * 0.66) / towerPx));
+  const midGY = (140 + topBlock.y) / 2;
+  const startScale = viewScale, startCam = cameraTargetY;
+
+  addTween({
+    elapsed: 0, duration: 650,
+    update(p) {
+      const e = 1 - Math.pow(1 - p, 3);
+      viewScale = startScale + (targetScale - startScale) * e;
+      cameraTargetY = startCam + (midGY - startCam) * e;
+    },
+    onDone() {
+      const best = getHighScore();
+      let subText = 'Final height: ' + score;
+      if (score > best) { setHighScore(score); subText += ' - new best!'; }
+      else { subText += ' (best: ' + best + ')'; }
+      const coinsWon = score * 10;
+      addCoins(coinsWon);
+      coinsEarnedEl.textContent = '+' + coinsWon + ' coins';
+      overlayTitle.textContent = 'Melted!';
+      overlaySub.textContent = subText;
+      overlay.style.display = 'flex';
+    },
+  });
+}
+
+/* ================= particles ================= */
+function spawnMelt(x, y, col, dir) {
+  if (skin === 'candy') {
+    for (let i = 0; i < 12; i++) particles.push({ x: x + (Math.random() - 0.5) * 34, y: y + Math.random() * 8, vx: dir * (0.4 + Math.random() * 1.6), vy: 0.5 + Math.random() * 1.8, r: 7 + Math.random() * 11, col, life: 0, max: 700 + Math.random() * 400, type: 'blob' });
+  } else if (skin === 'doodle') {
+    for (let i = 0; i < 9; i++) particles.push({ x, y, vx: (Math.random() - 0.5) * 4 + dir * 2, vy: -2.5 - Math.random() * 3, r: 5 + Math.random() * 9, col, life: 0, max: 620, type: 'ink', seed: Math.random() * 9 });
+  } else {
+    for (let i = 0; i < 30; i++) particles.push({ x: x + (Math.random() - 0.5) * 46, y: y + (Math.random() - 0.5) * 46, vx: (Math.random() - 0.5) * 6, vy: -3.5 - Math.random() * 4.5, r: Math.round(3 + Math.random() * 4), col: (Math.random() < 0.5 ? col : shade(col, -30)), life: 0, max: 900, type: 'px' });
+  }
+}
+function spawnDrip(x, y, col, dir) {
+  const n = skin === 'pixel' ? 8 : 5;
+  for (let i = 0; i < n; i++) particles.push({ x: x + dir * Math.random() * 8, y: y - Math.random() * 6, vx: dir * (0.2 + Math.random() * 0.6), vy: 0.6 + Math.random() * 1.4, r: skin === 'pixel' ? Math.round(3 + Math.random() * 3) : 4 + Math.random() * 6, col, life: 0, max: 520, type: skin === 'pixel' ? 'px' : 'blob' });
+}
+function spawnPlaceDust(x, y, col) {
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const a = Math.PI + (Math.random() - 0.5) * Math.PI * 0.9;
+    const sp = 1.5 + Math.random() * 2.2;
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: skin === 'pixel' ? Math.round(2 + Math.random() * 3) : 3 + Math.random() * 4, col: skin === 'doodle' ? SKIN_DATA.doodle.ink : col, life: 0, max: 380, type: skin === 'pixel' ? 'px' : (skin === 'doodle' ? 'ink' : 'blob'), seed: Math.random() * 9 });
+  }
+}
+function updateParticles(dt) {
+  const k = dt / 16;
+  particles = particles.filter(p => {
+    p.life += dt;
+    p.x += p.vx * k;
+    p.y -= p.vy * k;          // game y is up, vy>0 => moving down
+    p.vy -= 0.42 * k;         // gravity pulls down
+    return p.life < p.max;
+  });
+}
+
+/* ================= drawing ================= */
+function buildPxSprite(colIdx) {
+  const S = 24;
+  const c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const g = c.getContext('2d');
+  const base = SKIN_DATA.pixel.colors[colIdx % 6];
+  const lite = shade(base, 42);
+  const dark = shade(base, -46);
+  const cx = (S - 1) / 2, cy = (S - 1) / 2, rad = S / 2 - 0.5;
+  for (let py = 0; py < S; py++) {
+    for (let px = 0; px < S; px++) {
+      const dx = px - cx, dy = py - cy;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > rad) continue;
+      let col = base;
+      if (d > rad - 1.6) col = SKIN_DATA.pixel.ink;
+      else if (dx + dy < -rad * 0.35) col = lite;
+      else if (dx + dy > rad * 0.55) col = dark;
+      g.fillStyle = col;
+      g.fillRect(px, py, 1, 1);
+    }
+  }
+  return c;
+}
+
+function drawBackground() {
+  const par = (cameraCurY - BASE_CAM) * viewScaleCur;
+  if (skin === 'candy') {
+    const g = ctx.createLinearGradient(0, 0, 0, stageH);
+    g.addColorStop(0, SKIN_DATA.candy.bgTop);
+    g.addColorStop(0.55, SKIN_DATA.candy.bgMid);
+    g.addColorStop(1, SKIN_DATA.candy.bgBot);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, stageW, stageH);
+    // floating soft blobs
+    for (let i = 0; i < 6; i++) {
+      const bx = ((i * 97 + 40) % (stageW + 120)) - 60 + Math.sin(bgTime * 0.0004 + i) * 18;
+      const by = ((i * 160 + 120 + par * 0.15) % (stageH + 240)) - 120;
+      const rr = 40 + (i % 3) * 22;
+      const rg = ctx.createRadialGradient(bx, by, 0, bx, by, rr);
+      rg.addColorStop(0, 'rgba(255,255,255,0.5)');
+      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(bx, by, rr, 0, 7); ctx.fill();
+    }
+  } else if (skin === 'doodle') {
+    ctx.fillStyle = SKIN_DATA.doodle.paper;
+    ctx.fillRect(0, 0, stageW, stageH);
+    ctx.strokeStyle = SKIN_DATA.doodle.rule;
+    ctx.lineWidth = 2;
+    const step = 36;
+    let start = -((par * 0.4) % step);
+    for (let y = start; y < stageH; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(stageW, y); ctx.stroke();
+    }
+    ctx.strokeStyle = SKIN_DATA.doodle.margin;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(34, 0); ctx.lineTo(34, stageH); ctx.stroke();
+  } else {
+    const bands = SKIN_DATA.pixel.bands;
+    const h = stageH / bands.length;
+    for (let i = 0; i < bands.length; i++) {
+      ctx.fillStyle = bands[i];
+      ctx.fillRect(0, Math.floor(i * h), stageW, Math.ceil(h) + 1);
+    }
+    // blocky sun
+    ctx.imageSmoothingEnabled = false;
+    const sunX = Math.round(stageW * 0.72 / 6) * 6;
+    const sunY = Math.round((stageH * 0.24 + par * 0.1) / 6) * 6;
+    ctx.fillStyle = '#ffe08a';
+    pixelDisc(sunX, sunY, 34);
+    // blocky clouds
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    for (let i = 0; i < 3; i++) {
+      const cxx = ((i * 150 + 60 + bgTime * 0.008) % (stageW + 200)) - 100;
+      const cyy = Math.round((90 + i * 130 + par * 0.12) / 6) * 6;
+      ctx.fillRect(cxx, cyy, 66, 18);
+      ctx.fillRect(cxx + 16, cyy - 12, 40, 14);
+    }
+  }
+}
+function pixelDisc(x, y, r) {
+  const P = 6;
+  for (let py = -r; py <= r; py += P) {
+    for (let px = -r; px <= r; px += P) {
+      if (px * px + py * py <= r * r) ctx.fillRect(Math.round(x + px), Math.round(y + py), P, P);
+    }
+  }
+}
+
+function drawCone() {
+  const cx = sx(stageW / 2);
+  const apexY = sy(128);
+  const baseY = sy(-30);
+  const halfW = srad(SCOOP_R * 1.45);
+  const d = SKIN_DATA[skin];
+  if (skin === 'candy') {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, apexY);
+    ctx.lineTo(cx - halfW, baseY);
+    ctx.lineTo(cx + halfW, baseY);
+    ctx.closePath();
+    ctx.fillStyle = d.cone; ctx.fill();
+    ctx.clip();
+    ctx.strokeStyle = d.coneDark; ctx.lineWidth = 3; ctx.globalAlpha = 0.6;
+    for (let i = -3; i < 12; i++) {
+      ctx.beginPath(); ctx.moveTo(cx - halfW + i * 20, baseY); ctx.lineTo(cx - halfW + i * 20 + 60, apexY - 40); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + halfW - i * 20, baseY); ctx.lineTo(cx + halfW - i * 20 - 60, apexY - 40); ctx.stroke();
+    }
+    ctx.restore();
+  } else if (skin === 'doodle') {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    wobbleTri(cx, apexY, halfW, baseY, 5.1);
+    ctx.fillStyle = d.cone; ctx.fill();
+    ctx.save(); wobbleTri(cx, apexY, halfW, baseY, 5.1); ctx.clip();
+    ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 3;
+    for (let i = -2; i < 10; i++) { ctx.beginPath(); ctx.moveTo(cx - halfW + i * 16, baseY); ctx.lineTo(cx - halfW + i * 16 + 50, apexY); ctx.stroke(); }
+    ctx.restore();
+    wobbleTri(cx, apexY, halfW, baseY, 5.1);
+    ctx.strokeStyle = d.ink; ctx.lineWidth = Math.max(3, srad(4)); ctx.stroke();
+    ctx.restore();
+  } else {
+    ctx.imageSmoothingEnabled = false;
+    const P = 6;
+    for (let yy = apexY; yy < baseY; yy += P) {
+      const t = (yy - apexY) / (baseY - apexY);
+      const w = halfW * t;
+      const x0 = Math.round((cx - w) / P) * P;
+      const x1 = Math.round((cx + w) / P) * P;
+      for (let xx = x0; xx < x1; xx += P) {
+        ctx.fillStyle = ((Math.floor(xx / P) + Math.floor(yy / P)) % 2 === 0) ? d.cone : shade(d.cone, -28);
+        ctx.fillRect(xx, Math.round(yy), P, P);
+      }
+    }
+    ctx.strokeStyle = SKIN_DATA.pixel.ink; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, apexY); ctx.lineTo(cx - halfW, baseY); ctx.moveTo(cx, apexY); ctx.lineTo(cx + halfW, baseY);
+    ctx.stroke();
+  }
+}
+
+function wobbleTri(cx, apexY, halfW, baseY, seed) {
+  ctx.beginPath();
+  const j = () => (Math.sin(seed += 1.7) * 2.2);
+  ctx.moveTo(cx + j(), apexY + j());
+  ctx.lineTo(cx - halfW + j(), baseY + j());
+  ctx.lineTo(cx + j(), baseY + j() + 4);
+  ctx.lineTo(cx + halfW + j(), baseY + j());
+  ctx.closePath();
+}
+
+function wobbleCircle(x, y, r, seed, steps) {
+  const n = steps || 16;
+  ctx.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const a = i / n * Math.PI * 2;
+    const rr = r * (1 + Math.sin(seed + i * 1.7) * 0.035 + Math.cos(seed * 2 + i) * 0.025);
+    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath();
+}
+
+function drawScoop(x, y, r, colorIdx, opts) {
+  opts = opts || {};
+  const col = colorHex(colorIdx);
+  if (skin === 'candy') {
+    // drop shadow
+    ctx.fillStyle = 'rgba(150,90,110,0.13)';
+    ctx.beginPath(); ctx.ellipse(x, y + r * 0.55, r * 0.92, r * 0.34, 0, 0, 7); ctx.fill();
+    // body
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+    ctx.fillStyle = col; ctx.fill();
+    ctx.lineWidth = Math.max(2, r * 0.05); ctx.strokeStyle = 'rgba(120,70,90,0.25)'; ctx.stroke();
+    // shading
+    const g = ctx.createRadialGradient(x - r * 0.32, y - r * 0.36, r * 0.15, x, y, r);
+    g.addColorStop(0, 'rgba(255,255,255,0.45)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    // gloss
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.ellipse(x - r * 0.34, y - r * 0.38, r * 0.22, r * 0.13, -0.5, 0, 7); ctx.fill();
+    if (opts.topping) {
+      ctx.fillStyle = '#fff';
+      for (let i = 0; i < 7; i++) {
+        const a = i / 7 * 7 + x;
+        ctx.save(); ctx.translate(x + Math.cos(a) * r * 0.4, y - r * 0.5 + Math.sin(a) * r * 0.2); ctx.rotate(a);
+        ctx.fillRect(-1.6, -4, 3.2, 8); ctx.restore();
+      }
+    }
+    if (opts.face && r > 20) drawFaceCandy(x, y, r);
+  } else if (skin === 'doodle') {
+    const seed = opts.seed || 1;
+    wobbleCircle(x, y, r, seed);
+    ctx.fillStyle = col; ctx.fill();
+    ctx.save(); wobbleCircle(x, y, r, seed); ctx.clip();
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 3;
+    for (let i = -r; i < r; i += 8) { ctx.beginPath(); ctx.moveTo(x + i, y + r); ctx.lineTo(x + i + r, y - r * 0.3); ctx.stroke(); }
+    ctx.restore();
+    wobbleCircle(x, y, r, seed);
+    ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(3, r * 0.12); ctx.strokeStyle = SKIN_DATA.doodle.ink; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x - r * 0.28, y - r * 0.32, r * 0.4, Math.PI * 1.05, Math.PI * 1.5); ctx.stroke();
+    if (opts.topping) {
+      ctx.strokeStyle = SKIN_DATA.doodle.ink; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) {
+        const px = x - r * 0.5 + i * r * 0.25;
+        ctx.beginPath(); ctx.moveTo(px, y - r * 0.55); ctx.lineTo(px + 4, y - r * 0.3); ctx.stroke();
+      }
+    }
+    if (opts.face && r > 20) drawFaceDoodle(x, y, r);
+  } else {
+    const spr = pxSprites[colorIdx] || (pxSprites[colorIdx] = buildPxSprite(colorIdx));
+    ctx.imageSmoothingEnabled = false;
+    const size = Math.max(6, Math.round(r * 2));
+    ctx.drawImage(spr, Math.round(x - r), Math.round(y - r), size, size);
+    if (opts.topping) {
+      ctx.fillStyle = '#fff';
+      for (let i = 0; i < 5; i++) ctx.fillRect(Math.round(x - r * 0.5 + i * r * 0.25), Math.round(y - r * 0.55), 4, 4);
+    }
+    if (opts.face && r > 18) drawFacePixel(x, y, r);
+  }
+}
+
+function drawFaceCandy(x, y, r) {
+  ctx.fillStyle = 'rgba(60,30,40,0.78)';
+  ctx.beginPath(); ctx.arc(x - r * 0.28, y - r * 0.04, r * 0.09, 0, 7); ctx.arc(x + r * 0.28, y - r * 0.04, r * 0.09, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(60,30,40,0.72)'; ctx.lineWidth = Math.max(2, r * 0.05); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(x, y + r * 0.04, r * 0.26, 0.16 * Math.PI, 0.84 * Math.PI); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,120,150,0.32)';
+  ctx.beginPath(); ctx.arc(x - r * 0.44, y + r * 0.18, r * 0.11, 0, 7); ctx.arc(x + r * 0.44, y + r * 0.18, r * 0.11, 0, 7); ctx.fill();
+}
+function drawFaceDoodle(x, y, r) {
+  ctx.strokeStyle = SKIN_DATA.doodle.ink; ctx.fillStyle = SKIN_DATA.doodle.ink;
+  ctx.lineWidth = Math.max(2.5, r * 0.06); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - r * 0.3, y - r * 0.12); ctx.lineTo(x - r * 0.22, y - r * 0.02); ctx.moveTo(x - r * 0.14, y - r * 0.12); ctx.lineTo(x - r * 0.22, y - r * 0.02); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x + r * 0.14, y - r * 0.12); ctx.lineTo(x + r * 0.22, y - r * 0.02); ctx.moveTo(x + r * 0.3, y - r * 0.12); ctx.lineTo(x + r * 0.22, y - r * 0.02); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y + r * 0.08, r * 0.22, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+}
+function drawFacePixel(x, y, r) {
+  ctx.fillStyle = SKIN_DATA.pixel.ink;
+  const p = Math.max(3, Math.round(r * 0.12));
+  ctx.fillRect(Math.round(x - r * 0.32), Math.round(y - r * 0.1), p, p);
+  ctx.fillRect(Math.round(x + r * 0.32 - p), Math.round(y - r * 0.1), p, p);
+  ctx.fillRect(Math.round(x - r * 0.22), Math.round(y + r * 0.18), p, p);
+  ctx.fillRect(Math.round(x + r * 0.22 - p), Math.round(y + r * 0.18), p, p);
+  ctx.fillRect(Math.round(x - r * 0.22), Math.round(y + r * 0.18 + p), Math.round(r * 0.44), p);
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const px = sx(p.x), py = sy(p.y);
+    const t = p.life / p.max;
+    const alpha = 1 - t;
+    ctx.globalAlpha = Math.max(0, alpha);
+    if (p.type === 'blob') {
+      ctx.fillStyle = p.col;
+      const stretch = 1 + t * 1.4;
+      ctx.beginPath();
+      ctx.ellipse(px, py, srad(p.r) * (1 - t * 0.4), srad(p.r) * stretch, 0, 0, 7);
+      ctx.fill();
+    } else if (p.type === 'ink') {
+      ctx.fillStyle = p.col;
+      wobbleCircle(px, py, srad(p.r) * (1 - t * 0.3), p.seed || 2, 9);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = p.col;
+      const s = Math.max(2, Math.round(srad(p.r)));
+      ctx.fillRect(Math.round(px), Math.round(py), s, s);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ================= main loop ================= */
+let lastFrameTime = null;
+function frame(now) {
+  if (gameScreen.classList.contains('open')) {
+    const dt = lastFrameTime == null ? 16 : Math.min(48, now - lastFrameTime);
+    lastFrameTime = now;
+    bgTime += dt;
+
+    if (running && current && !dropping) {
+      current.x += current.dir * current.speed;
+      if (current.x <= SCOOP_R) { current.x = SCOOP_R; current.dir = 1; }
+      else if (current.x >= stageW - SCOOP_R) { current.x = stageW - SCOOP_R; current.dir = -1; }
+    }
+    if (dropping && current) {
+      dropping.t += dt;
+      const p = Math.min(1, dropping.t / dropping.dur);
+      current.fallP = p * p;
+      if (p >= 1) { dropping = null; current.fallP = 1; resolveDrop(); }
+    }
+
+    updateParticles(dt);
+    updateTweens(dt);
+
+    cameraCurY += (cameraTargetY - cameraCurY) * 0.12;
+    viewScaleCur += (viewScale - viewScaleCur) * 0.12;
+    if (shake > 0.3) shake *= 0.86; else shake = 0;
+
+    // render
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const sh = shake ? (Math.random() - 0.5) * shake : 0;
+    const sv = shake ? (Math.random() - 0.5) * shake : 0;
+    ctx.clearRect(0, 0, stageW, stageH);
+    drawBackground();
+    ctx.save();
+    ctx.translate(sh, sv);
+
+    drawCone();
+
+    for (const b of blocks) {
+      let scaleX = 1, scaleY = 1;
+      if (b.pop) {
+        const age = performance.now() - b.pop;
+        if (age < 220) { const k = age / 220; const s = Math.sin(k * Math.PI) * 0.14; scaleY = 1 - s; scaleX = 1 + s; }
+        else b.pop = 0;
+      }
+      const bx = sx(b.x), by = sy(b.y), br = srad(b.r);
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.scale(scaleX, scaleY);
+      drawScoop(0, 0, br, b.colorIdx, { topping: b.topping, face: b.face, seed: b.seed });
+      ctx.restore();
+    }
+
+    if (running && current) {
+      const lift = FALL_LIFT * (1 - (current.fallP || 0));
+      const fx = sx(current.x), fy = sy(current.y + lift), fr = srad(SCOOP_R);
+      drawScoop(fx, fy, fr, current.colorIdx, { seed: current.seed, face: false });
+    }
+
+    drawParticles();
+    ctx.restore();
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  } else {
+    lastFrameTime = null;
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ================= input ================= */
+document.addEventListener('pointerdown', (e) => {
+  if (!gameScreen.classList.contains('open')) return;
+  if (e.target.closest('#overlay') || e.target.id === 'gameBackBtn' || e.target.id === 'skinCycleBtn') return;
+  drop();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && gameScreen.classList.contains('open')) drop();
+});
+restartBtn.addEventListener('click', (e) => { e.stopPropagation(); resetGame(); });
+
+window.addEventListener('resize', () => { if (gameScreen.classList.contains('open')) sizeCanvas(); });
+
+/* ================= boot ================= */
+sizeCanvas();
+setCoins(getCoins());
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
